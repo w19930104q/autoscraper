@@ -118,6 +118,53 @@ scraper.build(url, wanted_list)
 Simple, right?
 
 
+### Getting one result per record
+
+When a page contains a list of cards (products, jobs, posts, ...), the flat
+results cannot tell which price belongs to which card.  The optional record
+interface takes the CSS selector of the record container plus a `wanted_dict`
+sample.  It learns the fields once and then returns one dictionary per
+container, in DOM order.  Every alias is present in every row; a missing field
+is an empty list.
+
+```python
+from autoscraper import AutoScraper
+
+html = """
+<div class="product">
+  <h2 class="name">Alpha</h2>
+  <span class="price">$10</span>
+</div>
+<div class="product">
+  <h2 class="name">Beta</h2>
+</div>
+"""
+
+scraper = AutoScraper()
+records = scraper.build(
+    html=html,
+    wanted_dict={"name": ["Alpha"], "price": ["$10"]},
+    record_selector=".product",       # record_container= also works
+)
+
+# [{'name': ['Alpha'], 'price': ['$10']},
+#  {'name': ['Beta'],  'price': []}]     # Beta has no price, and does not
+#                                        # borrow the next card's price
+```
+
+The same rows can be requested later, including after loading a saved model:
+
+```python
+scraper.get_result_records(html=html)       # uses the learned selector
+# scraper.get_result_similar(html=html, records=True) also works
+```
+
+Nested containers selected by the same selector become their own rows, and
+their fields are never mixed into the outer row.  Repeated text coming from
+different nodes is preserved.  When several learned rules hit the same node
+for the same alias, the value from the first learned rule is used.
+
+
 ### Saving the model
 
 We can now save the built model to use it later. To save:
