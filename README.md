@@ -118,6 +118,61 @@ scraper.build(url, wanted_list)
 Simple, right?
 
 
+### Getting one result per record
+
+When a page contains repeated cards (products, jobs, posts, ...), the flat
+results cannot tell which price belongs to which card.  The record interface
+takes the CSS selector of the record container plus a `wanted_dict` sample,
+learns the field rules once, and then returns one dictionary per container,
+in DOM order.  Every alias is present in every row; a missing field is an
+empty list.  The learned rules are applied inside each container only, so a
+page header or a neighbouring card is never absorbed into a record.
+
+```python
+from autoscraper import AutoScraper
+
+html = """
+<div class="product">
+  <h2 class="name">Alpha</h2>
+  <span class="price">$10</span>
+</div>
+<div class="product">
+  <h2 class="name">Beta</h2>
+</div>
+"""
+
+scraper = AutoScraper()
+records = scraper.build(
+    html=html,
+    wanted_dict={"name": ["Alpha"], "price": ["$10"]},
+    record_selector=".product",       # record_container=/container= also work
+)
+
+# [{'name': ['Alpha'], 'price': ['$10']},
+#  {'name': ['Beta'],  'price': []}]     # Beta has no price, and does not
+#                                        # borrow the other card's price
+```
+
+The same rows can be requested later, including after loading a saved model,
+and on other pages with the same card structure:
+
+```python
+scraper.get_result_records(html=html)   # uses the learned selector
+# scraper.get_records(html=html) and
+# scraper.get_result_similar(html=html, records=True) work too
+```
+
+Nested containers matched by the same selector become their own rows, and
+their fields never leak into the outer row.  Repeated text coming from
+different nodes is preserved, completely identical cards are kept as separate
+rows, and when several learned rules hit the same node for the same alias,
+the value from the first learned rule is used.  Text, attribute and full-URL
+samples are supported.  Record rules and the container selector are stored
+by `save()` and restored by `load()`; a `wanted_dict` alias without a sample
+fails the learning, and an invalid model file fails `load()` without
+replacing the previously loaded model.
+
+
 ### Saving the model
 
 We can now save the built model to use it later. To save:
